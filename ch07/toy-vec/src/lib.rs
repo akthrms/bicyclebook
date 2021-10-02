@@ -48,6 +48,32 @@ impl<T: Default> ToyVec<T> {
     }
 
     fn grow(&mut self) {
-        unimplemented!();
+        if self.capacity() == 0 {
+            self.elements = Self::allocate_in_heep(1);
+        } else {
+            let new_elements = Self::allocate_in_heep(self.capacity() * 2);
+            let old_elements = std::mem::replace(&mut self.elements, new_elements);
+
+            for (i, elem) in old_elements.into_vec().into_iter().enumerate() {
+                self.elements[i] = elem;
+            }
+        }
+    }
+
+    pub fn get_or<'a>(&'a self, index: usize, default: &'a T) -> &'a T {
+        match self.get(index) {
+            Some(v) => v,
+            None => default,
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            let elem = std::mem::replace(&mut self.elements[self.len], Default::default());
+            Some(elem)
+        }
     }
 }
