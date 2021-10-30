@@ -525,6 +525,49 @@ impl StdError for Error {
     }
 }
 
+fn print_annot(input: &str, loc: Loc) {
+    eprintln!("{}", input);
+    eprintln!("{}{}", " ".repeat(loc.0), "^".repeat(loc.1 - loc.0));
+}
+
+impl Error {
+    fn show_diagnostic(&self, input: &str) {
+        use self::Error::*;
+        use self::ParseError as P;
+
+        let (e, loc): (&dyn StdError, Loc) = match self {
+            Lexer(e) => (e, e.loc.clone()),
+            Parser(e) => {
+                let loc = match e {
+                    P::UnexpectedToken(Token { loc, .. })
+                    | P::NotExpression(Token { loc, .. })
+                    | P::NotOperator(Token { loc, .. })
+                    | P::UnclosedOpenParen(Token { loc, .. }) => loc.clone(),
+                    P::RedundantExpression(Token { loc, .. }) => Loc(loc.0, input.len()),
+                    P::Eof => Loc(input.len(), input.len() + 1),
+                };
+
+                (e, loc)
+            }
+        };
+
+        eprintln!("{}", e);
+
+        print_annot(input, loc);
+    }
+}
+
+fn show_trace<E: StdError>(e: E) {
+    eprintln!("{}", e);
+
+    let mut source = e.source();
+
+    while let Some(e) = source {
+        eprintln!("caused by {}", e);
+        source = e.source();
+    }
+}
+
 fn prompt(s: &str) -> io::Result<()> {
     use std::io::{stdout, Write};
 
@@ -549,14 +592,8 @@ fn main() {
             let ast = match line.parse::<Ast>() {
                 Ok(ast) => ast,
                 Err(e) => {
-                    eprintln!("{}", e);
-                    let mut source = e.source();
-
-                    while let Some(e) = source {
-                        eprintln!("caused by {}", e);
-                        source = e.source();
-                    }
-
+                    e.show_diagnostic(&line);
+                    show_trace(e);
                     continue;
                 }
             };
